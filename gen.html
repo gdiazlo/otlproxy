@@ -1,0 +1,126 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html lang="en">
+<head>
+  <meta name="generator" content="HTML Tidy for HTML5 for Linux version 5.7.16">
+  <link href="https://fonts.googleapis.com/css?family=Crimson+Text" rel="stylesheet">
+  <style type="text/css">
+  body {
+  color: #555;
+  font-family: 'Crimson Text', serif;
+  font-size: 22px;
+  }
+
+  input, button {
+  color: #555;
+  font-family: 'Crimson Text', serif;
+  font-size: 18px; 
+  width: 450px;
+  }
+
+  .unread {
+  color: red;
+  }
+
+  .read {
+  color: green;
+  }
+  div {
+    width: 500px;
+    height: auto;
+
+    position: absolute;
+    top:0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+
+    margin: auto;
+  }
+  </style>
+  <title>Authenticated url generator</title>
+</head>
+<body>
+  <div>
+    <h1>Authenticated URL generator</h1>
+    <form action="#" method="post">
+      <label for="server">Server Url</label><br>
+      <input type="text" id="server"><br>
+      <label for="email">User email</label><br>
+      <input type="email" id="email"><br>
+      <label for="password">Shared secret</label><br>
+      <input type="password" id="password"><br>
+      <label for="start">Start</label><br>
+      <input type="datetime-local" id="start"><br>
+      <label for="end">End</label><br>
+      <input type="datetime-local" id="end"><br>
+      <br>
+      <button id="generate">Generate</button>
+    </form><br>
+    <h3>Generated links</h3><br>
+    <ul id="list"></ul>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sjcl/1.0.7/sjcl.min.js" type="text/javascript"></script> 
+  <script type="text/javascript">
+
+
+  function get(id) {
+        return document.getElementById(id).value;
+  }
+
+  function set(id, val) {
+        return document.getElementById(id).value = val;
+  }
+
+  function getToken() {
+        var salt = get("password");
+        var start =  Math.floor(new Date(get("start")) / 1000);
+        var end = Math.floor(new Date(get("end")) / 1000);
+        var id = get("email");
+
+        var digest = sjcl.hash.sha256.hash(salt+start+end+id); 
+        var digestArray = [sjcl.codec.hex.fromBits(digest), start, end, id];
+        console.log(digestArray);
+        return get("server") + "/" + encodeURIComponent(btoa(digestArray.join("/")));
+  }
+
+  function createLink(token) {
+        var newlink = document.createElement("a");
+        newlink.setAttribute('class', 'unread');
+        newlink.setAttribute('href', token );
+
+        newlink.onclick = function( event ) {
+                event.preventDefault();
+                navigator.clipboard.writeText(token).then(function() {
+                        console.log('Async: Copying to clipboard was successful!');
+                        event.target.setAttribute("class","read")
+                }, function(err) {
+                        console.error('Async: Could not copy text: ', err);
+                });
+        };
+
+        newlink.appendChild(document.createTextNode("Link for "+get("email")))
+        return newlink;
+  }
+
+  function addLink(link) {
+        var ul = document.getElementById("list");
+        var li = document.createElement("li");
+        li.appendChild(link);
+        ul.appendChild(li);
+  }
+
+  function submit( event ) {
+        event.preventDefault();
+        console.log("here");
+        var token = getToken();
+        console.log(token);
+        var link = createLink(token)
+        addLink(link)
+  };
+
+  set("start",new Date().toJSON().slice(0,19));
+  set("end", new Date().toJSON().slice(0,19));
+  document.getElementById("generate").addEventListener("click", submit, true);
+  </script>
+</body>
+</html>
