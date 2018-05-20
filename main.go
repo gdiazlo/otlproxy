@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"log"
@@ -18,13 +19,15 @@ func main() {
 	var backendUrl string
 	var salt string
 	var tls bool
-	var keyFile, certFile string
+	var addr, tlsAddr, keyFile, certFile string
 	var err error
 	flag.BoolVar(&tls, "tls", true, "serve TLS requests")
 	flag.StringVar(&keyFile, "key", "/etc/ssl/private/key.pem", "private key")
 	flag.StringVar(&certFile, "crt", "/etc/ssl/private/cert.pem", "certificate")
 	flag.StringVar(&backendUrl, "b", "http://localhost:80", "backend to route requests to if autenticated")
 	flag.StringVar(&salt, "s", "salt", "salt to generate links")
+	flag.StringVar(&addr, "a", ":80", "ip address:port to listen for http requests")
+	flag.StringVar(&tlsAddr, "sa", ":443", "ip address:port to listen for https requests")
 
 	flag.Parse()
 
@@ -38,9 +41,9 @@ func main() {
 	http.HandleFunc("/", handler(proxy, salt))
 
 	if tls {
-		err = http.ListenAndServeTLS(":443", certFile, keyFile, nil)
+		err = http.ListenAndServeTLS(tlsAddr, certFile, keyFile, nil)
 	} else {
-		err = http.ListenAndServe(":80", nil)
+		err = http.ListenAndServe(addr, nil)
 	}
 
 	if err != nil {
@@ -72,11 +75,17 @@ func checkLink(salt, digest, start, end, id string) bool {
 
 func handler(p *httputil.ReverseProxy, salt string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		q := strings.Split(r.URL.Path, "/")
-		log.Println(len(q))
-		if !checkLink(salt, q[1], q[2], q[3], q[4]) {
+		token, err := base64.StdEncoding.DecodeString(r.URL.Path[1:])
+		if err != nil {
 			http.Error(w, "auth error", 401)
-			log.Println("Auth error")
+			log.Println("Unable to decode url. ", err, r.URL.Path[1:])
+			return
+		}
+		q := strings.Split(string(token), "/")
+		log.Println(len(q))
+		if !checkLink(salt, q[0], q[1], q[2], q[3]) {
+			http.Error(w, "auth error", 401)
+			log.Println("Unable to authentify token. ", q)
 			return
 		}
 		r.URL.Path = "/"
