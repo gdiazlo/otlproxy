@@ -69,26 +69,37 @@ func checkLink(salt, digest, start, end, id string) bool {
 		log.Println("Link expired: ", s, e, now)
 		return false
 	}
-	log.Println(d)
+
 	return d == digest
 }
 
 func handler(p *httputil.ReverseProxy, salt string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		token, err := base64.StdEncoding.DecodeString(r.URL.Path[1:])
+		url := strings.Split(string(r.URL.Path), "/")
+		if len(url) < 2 {
+			http.Error(w, "auth error", 401)
+			log.Println("No url found. ", r.URL.Path)
+			return
+		}
+		token, err := base64.StdEncoding.DecodeString(url[1])
 		if err != nil {
 			http.Error(w, "auth error", 401)
-			log.Println("Unable to decode url. ", err, r.URL.Path[1:])
+			log.Println("Unable to decode url. ", err, url[1:])
 			return
 		}
 		q := strings.Split(string(token), "/")
-		log.Println(len(q))
-		if !checkLink(salt, q[0], q[1], q[2], q[3]) {
+		if len(q) < 4 {
 			http.Error(w, "auth error", 401)
-			log.Println("Unable to authentify token. ", q)
+			log.Println("Incorrect number of params: ", q)
 			return
 		}
-		r.URL.Path = "/"
+
+		if !checkLink(salt, q[0], q[1], q[2], q[3]) {
+			http.Error(w, "auth error", 401)
+			log.Println("Incorrect token. ", q)
+			return
+		}
+		r.URL.Path = "/" + strings.Join(url[2:], "/")
 		p.ServeHTTP(w, r)
 	}
 }
