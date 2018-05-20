@@ -75,18 +75,20 @@ func checkLink(salt, digest, start, end, id string) bool {
 
 func handler(p *httputil.ReverseProxy, salt string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		url := strings.Split(string(r.URL.Path), "/")
-		if len(url) < 2 {
+		u := strings.Split(string(r.URL.Path), "/")
+
+		if len(u) < 2 {
 			http.Error(w, "auth error", 401)
 			log.Println("No url found. ", r.URL.Path)
 			return
 		}
-		token, err := base64.StdEncoding.DecodeString(url[1])
+		token, err := base64.StdEncoding.DecodeString(u[1])
 		if err != nil {
 			http.Error(w, "auth error", 401)
-			log.Println("Unable to decode url. ", err, url[1:])
+			log.Println("Unable to decode url. ", err, u[1])
 			return
 		}
+
 		q := strings.Split(string(token), "/")
 		if len(q) < 4 {
 			http.Error(w, "auth error", 401)
@@ -99,7 +101,7 @@ func handler(p *httputil.ReverseProxy, salt string) func(http.ResponseWriter, *h
 			log.Println("Incorrect token. ", q)
 			return
 		}
-		r.URL.Path = "/" + strings.Join(url[2:], "/")
+		r.URL.Path = "/" + strings.Join(u[2:], "/")
 		p.ServeHTTP(w, r)
 	}
 }
